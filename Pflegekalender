@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>24h-Pflege Kalender</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #222;
+        }
+
+        body {
+            margin: 0;
+            padding: 0.5rem;
+            background: #f5f5f5;
+        }
+
+        .app-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            margin: 0 0 0.5rem;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .controls select, .controls button {
+            padding: 0.35rem 0.6rem;
+            font-size: 0.95rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+        }
+
+        .controls button {
+            cursor: pointer;
+        }
+
+        .controls button:active {
+            transform: scale(0.98);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.25rem;
+            font-size: 0.8rem;
+        }
+
+        .weekday-header {
+            font-weight: 600;
+            text-align: center;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .day-cell {
+            min-height: 65px;
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 0.25rem;
+            border: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+        }
+
+        .day-cell.disabled {
+            background: #f0f0f0;
+            color: #aaa;
+            cursor: default;
+        }
+
+        .day-number {
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+
+        .day-entries {
+            font-size: 0.7rem;
+            line-height: 1.3;
+            flex: 1;
+        }
+
+        .day-cell.has-entries {
+            background: #dff6dd; /* grünlich: Pflegerin frei */
+            border-color: #9fd89b;
+        }
+
+        .entry-pill {
+            background: rgba(0,0,0,0.03);
+            border-radius: 6px;
+            padding: 0.05rem 0.2rem;
+            margin-bottom: 0.1rem;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .legend {
+            margin: 0.5rem 0;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .legend-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            background: #dff6dd;
+            border: 1px solid #9fd89b;
+        }
+
+        /* Modal / Dialog */
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .modal-backdrop.visible {
+            display: flex;
+        }
+
+        .modal {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1rem;
+            max-width: 500px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .close-btn {
+            border: none;
+            background: transparent;
+            font-size: 1.3rem;
+            cursor: pointer;
+        }
+
+        .entries-list {
+            margin-bottom: 0.75rem;
+        }
+
+        .entries-list h3 {
+            font-size: 0.9rem;
+            margin: 0 0 0.3rem;
+        }
+
+        .entry-row {
+            border-radius: 8px;
+            border: 1px solid #eee;
+            padding: 0.4rem;
+            margin-bottom: 0.3rem;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            gap: 0.4rem;
+        }
+
+        .entry-row-main {
+            flex: 1;
+        }
+
+        .entry-row button {
+            font-size: 0.75rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 6px;
+            border: 1px solid #d9534f;
+            background: #f8d7da;
+            color: #a94442;
+            cursor: pointer;
+        }
+
+        .entry-row button:active {
+            transform: scale(0.97);
+        }
+
+        form label {
+            font-size: 0.8rem;
+            display: block;
+            margin-top: 0.35rem;
+            margin-bottom: 0.1rem;
+        }
+
+        form select,
+        form input,
+        form textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.3rem;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+        form textarea {
+            min-height: 50px;
+            resize: vertical;
+        }
+
+        .form-row-inline {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .form-row-inline > div {
+            flex: 1;
+        }
+
+        .save-btn {
+            margin-top: 0.5rem;
+            width: 100%;
+            padding: 0.4rem;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            background: #0078d4;
+            color: #ffffff;
+        }
+
+        .save-btn:active {
+            transform: scale(0.98);
+        }
+
+        @media (max-width: 600px) {
+            .calendar-grid {
+                font-size: 0.75rem;
+            }
+            .day-cell {
+                min-height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <h1>Kalender für 24-Stunden-Pflege</h1>
+
+    <div class="controls">
+        <button id="prevMonthBtn">&lt;</button>
+        <select id="monthSelect"></select>
+        <select id="yearSelect"></select>
+        <button id="nextMonthBtn">&gt;</button>
+    </div>
+
+    <div class="legend">
+        <div class="legend-box"></div>
+        <span>Grün = Angehörige schauen (Pflegerin hat frei)</span>
+    </div>
+
+    <div class="calendar-grid" id="calendarGrid">
+        <!-- Wochentage + Tage werden per JS eingefügt -->
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="modalTitle">Einträge</h2>
+            <button class="close-btn" id="closeModalBtn">&times;</button>
+        </div>
+
+        <div class="entries-list" id="entriesList">
+            <!-- vorhandene Einträge -->
+        </div>
+
+        <form id="entryForm">
+            <h3 style="font-size:0.9rem; margin:0 0 0.3rem;">Neuen Eintrag hinzufügen</h3>
+            <label for="relativeSelect">Welche Angehörige / welcher Angehörige?</label>
+            <select id="relativeSelect" required>
+                <option value="">Bitte auswählen…</option>
+                <option>Maria</option>
+                <option>Gerda</option>
+                <option>Barbara</option>
+                <option>Hermann</option>
+                <option>Karl</option>
+            </select>
+
+            <div class="form-row-inline">
+                <div>
+                    <label for="fromTime">Von</label>
+                    <input type="time" id="fromTime">
+                </div>
+                <div>
+                    <label for="toTime">Bis</label>
+                    <input type="time" id="toTime">
+                </div>
+            </div>
+
+            <label for="notes">Notiz (optional)</label>
+            <textarea id="notes" placeholder="z. B. Arzttermin, Einkauf, Spaziergang …"></textarea>
+
+            <button type="submit" class="save-btn">Eintrag speichern</button>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    const calendarGrid = document.getElementById('calendarGrid');
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect  = document.getElementById('yearSelect');
+    const prevBtn     = document.getElementById('prevMonthBtn');
+    const nextBtn     = document.getElementById('nextMonthBtn');
+
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalTitle    = document.getElementById('modalTitle');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const entriesList   = document.getElementById('entriesList');
+    const entryForm     = document.getElementById('entryForm');
+
+    const relativeSelect = document.getElementById('relativeSelect');
+    const fromTimeInput  = document.getElementById('fromTime');
+    const toTimeInput    = document.getElementById('toTime');
+    const notesInput     = document.getElementById('notes');
+
+    let currentYear;
+    let currentMonth; // 0–11
+    let selectedDateKey = null; // z. B. "2025-01-15"
+
+    // Daten in localStorage
+    function loadData() {
+        const raw = localStorage.getItem('pflegeKalenderData_v1');
+        if (!raw) return {};
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            console.error('Fehler beim Lesen von localStorage', e);
+            return {};
+        }
+    }
+
+    function saveData(data) {
+        localStorage.setItem('pflegeKalenderData_v1', JSON.stringify(data));
+    }
+
+    let data = loadData(); // Struktur: data[dateKey] = [ {name, from, to, notes} ]
+
+    function getDateKey(year, month, day) {
+        const m = String(month + 1).padStart(2, '0');
+        const d = String(day).padStart(2, '0');
+        return year + '-' + m + '-' + d;
+    }
+
+    // Dropdowns initialisieren
+    function initSelectors() {
+        const monthNames = [
+            'Januar','Februar','März','April','Mai','Juni',
+            'Juli','August','September','Oktober','November','Dezember'
+        ];
+        monthSelect.innerHTML = '';
+        monthNames.forEach((name, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = name;
+            monthSelect.appendChild(opt);
+        });
+
+        const thisYear = new Date().getFullYear();
+        yearSelect.innerHTML = '';
+        for (let y = thisYear - 2; y <= thisYear + 5; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSelect.appendChild(opt);
+        }
+    }
+
+    function renderCalendar(year, month) {
+        calendarGrid.innerHTML = '';
+
+        // Wochentagskopf (Montag–Sonntag)
+        const weekdays = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+        weekdays.forEach(wd => {
+            const div = document.createElement('div');
+            div.className = 'weekday-header';
+            div.textContent = wd;
+            calendarGrid.appendChild(div);
+        });
+
+        const firstDay = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // getDay(): 0=So,1=Mo,... → wir wollen 0=Mo
+        let startWeekday = firstDay.getDay(); // 0–6
+        if (startWeekday === 0) {
+            startWeekday = 7;
+        }
+        const leadingEmpty = startWeekday - 1; // Anzahl leerer Felder vor dem 1.
+
+        // Leere Zellen
+        for (let i = 0; i < leadingEmpty; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'day-cell disabled';
+            calendarGrid.appendChild(emptyCell);
+        }
+
+        // Tage
+        for (let day = 1; day <= daysInMonth; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+
+            const dateKey = getDateKey(year, month, day);
+            const dayEntries = data[dateKey] || [];
+
+            if (dayEntries.length > 0) {
+                cell.classList.add('has-entries');
+            }
+
+            const dayNumber = document.createElement('div');
+            dayNumber.className = 'day-number';
+            dayNumber.textContent = day;
+
+            const entriesContainer = document.createElement('div');
+            entriesContainer.className = 'day-entries';
+
+            dayEntries.slice(0, 3).forEach(entry => {
+                const pill = document.createElement('div');
+                pill.className = 'entry-pill';
+                const timeText = (entry.from || entry.to) ?
+                    ((entry.from || '') + (entry.to ? '–' + entry.to : '')) :
+                    '';
+                pill.textContent = (entry.name || '') + (timeText ? ' (' + timeText + ')' : '');
+                entriesContainer.appendChild(pill);
+            });
+
+            if (dayEntries.length > 3) {
+                const more = document.createElement('div');
+                more.className = 'entry-pill';
+                more.textContent = '… ' + (dayEntries.length - 3) + ' weitere';
+                entriesContainer.appendChild(more);
+            }
+
+            cell.appendChild(dayNumber);
+            cell.appendChild(entriesContainer);
+
+            cell.addEventListener('click', () => {
+                openModalForDate(year, month, day);
+            });
+
+            calendarGrid.appendChild(cell);
+        }
+    }
+
+    function openModalForDate(year, month, day) {
+        selectedDateKey = getDateKey(year, month, day);
+        const dateObj = new Date(year, month, day);
+        const dateStr = dateObj.toLocaleDateString('de-CH', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        const weekdayStr = dateObj.toLocaleDateString('de-CH', { weekday: 'long' });
+        modalTitle.textContent = weekdayStr.charAt(0).toUpperCase() + weekdayStr.slice(1) +
+            ' – ' + dateStr;
+
+        renderEntriesList();
+        // Formular zurücksetzen
+        entryForm.reset();
+
+        modalBackdrop.classList.add('visible');
+    }
+
+    function closeModal() {
+        modalBackdrop.classList.remove('visible');
+        selectedDateKey = null;
+    }
+
+    function renderEntriesList() {
+        entriesList.innerHTML = '';
+        if (!selectedDateKey) return;
+
+        const dayEntries = data[selectedDateKey] || [];
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'Bestehende Einträge';
+        entriesList.appendChild(heading);
+
+        if (dayEntries.length === 0) {
+            const p = document.createElement('p');
+            p.style.fontSize = '0.8rem';
+            p.textContent = 'Noch keine Einträge für diesen Tag.';
+            entriesList.appendChild(p);
+            return;
+        }
+
+        dayEntries.forEach((entry, index) => {
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+
+            const main = document.createElement('div');
+            main.className = 'entry-row-main';
+            const line1 = document.createElement('div');
+            line1.textContent = (entry.name || '') +
+                ((entry.from || entry.to) ? ' – ' +
+                    (entry.from || '') + (entry.to ? ' bis ' + entry.to : '') : '');
+            const line2 = document.createElement('div');
+            line2.style.fontSize = '0.75rem';
+            line2.style.color = '#555';
+            line2.textContent = entry.notes || '';
+            main.appendChild(line1);
+            if (entry.notes) main.appendChild(line2);
+
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Löschen';
+            delBtn.addEventListener('click', () => {
+                deleteEntry(selectedDateKey, index);
+            });
+
+            row.appendChild(main);
+            row.appendChild(delBtn);
+
+            entriesList.appendChild(row);
+        });
+    }
+
+    function deleteEntry(dateKey, index) {
+        if (!data[dateKey]) return;
+        data[dateKey].splice(index, 1);
+        if (data[dateKey].length === 0) {
+            delete data[dateKey];
+        }
+        saveData(data);
+        renderEntriesList();
+        renderCalendar(currentYear, currentMonth);
+    }
+
+    // Formular speichern
+    entryForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!selectedDateKey) return;
+
+        const name = relativeSelect.value.trim();
+        const from = fromTimeInput.value;
+        const to   = toTimeInput.value;
+        const notes = notesInput.value.trim();
+
+        if (!name) {
+            alert('Bitte eine Angehörige bzw. einen Angehörigen auswählen.');
+            return;
+        }
+
+        const newEntry = { name, from, to, notes };
+        if (!data[selectedDateKey]) {
+            data[selectedDateKey] = [];
+        }
+        data[selectedDateKey].push(newEntry);
+        saveData(data);
+
+        // UI aktualisieren
+        renderEntriesList();
+        renderCalendar(currentYear, currentMonth);
+        entryForm.reset();
+    });
+
+    // Modal schließen
+    closeModalBtn.addEventListener('click', closeModal);
+    modalBackdrop.addEventListener('click', function(e) {
+        if (e.target === modalBackdrop) {
+            closeModal();
+        }
+    });
+
+    // Monat / Jahr ändern
+    monthSelect.addEventListener('change', function() {
+        currentMonth = parseInt(this.value, 10);
+        renderCalendar(currentYear, currentMonth);
+    });
+
+    yearSelect.addEventListener('change', function() {
+        currentYear = parseInt(this.value, 10);
+        renderCalendar(currentYear, currentMonth);
+    });
+
+    prevBtn.addEventListener('click', function() {
+        currentMonth--;
+        if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+        }
+        monthSelect.value = currentMonth;
+        yearSelect.value = currentYear;
+        renderCalendar(currentYear, currentMonth);
+    });
+
+    nextBtn.addEventListener('click', function() {
+        currentMonth++;
+        if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        }
+        monthSelect.value = currentMonth;
+        yearSelect.value = currentYear;
+        renderCalendar(currentYear, currentMonth);
+    });
+
+    // Start
+    function init() {
+        initSelectors();
+        const now = new Date();
+        currentYear = now.getFullYear();
+        currentMonth = now.getMonth();
+
+        monthSelect.value = currentMonth;
+        yearSelect.value = currentYear;
+
+        renderCalendar(currentYear, currentMonth);
+    }
+
+    init();
+})();
+</script>
+</body>
+</html>
